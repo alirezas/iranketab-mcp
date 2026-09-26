@@ -6,12 +6,22 @@ Modelled on [digikala-mcp](https://github.com/mmdju/digikala-mcp). Not affiliate
 
 ## Connect
 
+**Hosted endpoint** (Streamable HTTP, stateless, no key): `https://iranketab-mcp.vercel.app/mcp`
+
+```json
+{ "mcpServers": { "iranketab": { "url": "https://iranketab-mcp.vercel.app/mcp" } } }
+```
+
+```bash
+claude mcp add --transport http iranketab https://iranketab-mcp.vercel.app/mcp
+```
+
+**Local** (stdio). This is faster from inside Iran, because the hosted copy runs in Frankfurt and fetches from iranketab take 2-10 s there on a cache miss:
+
 ```bash
 npm install && npm run build
 claude mcp add iranketab -- node "$PWD/dist/index.js"
 ```
-
-Any stdio MCP client works the same way (`command: node`, `args: [".../dist/index.js"]`).
 
 Then ask: "which translation of Crime and Punishment is best rated and in stock?", "cheapest White Nights that isn't abridged", "what did Soroush Habibi translate?", "bestsellers in Russian literature".
 
@@ -34,8 +44,10 @@ All tools carry `readOnlyHint`. Every `book_*` tool accepts a work id **or** an 
 ## How it works
 
 ```
-agent --stdio--> iranketab-mcp --HTTPS, 1 req / 500ms--> www.iranketab.ir
+agent --stdio or POST /mcp--> iranketab-mcp --HTTPS, 1 req / 500ms--> www.iranketab.ir
 ```
+
+`src/server.ts` defines the tools once. `src/index.ts` serves them over stdio, and `src/web.ts` serves them as a web-standard `Request -> Response` handler (stateless Streamable HTTP with JSON responses, CORS, and `/health`). On Vercel, `api/mcp.ts` and `api/health.ts` wrap that handler. The functions run in `fra1` (Frankfurt), the region closest to Iran.
 
 iranketab has no public API. Two sources are used:
 
@@ -54,17 +66,29 @@ Details that matter:
 - **Listing entries are editions.** `/book/{editionId}` redirects to the work.
 - **Unknown book ids return HTTP 200** with an empty page (a soft 404). This is detected as "no JSON-LD and no editions".
 - **Parse JSON-LD with `rawText`**, not `text`: `text` decodes `&#xA;` into control characters that `JSON.parse` rejects.
+- **Hosting outside Iran is slow on a cache miss.** iranketab serves foreign visitors through Cloudflare, not ArvanCloud. Measured from Vercel `fra1`: a book page takes about 2 s uncached and a search about 10 s. Cloudflare Workers in Paris took 7-12 s. Cached calls take about 0.5 s.
 - **Politeness:**
   - requests are serialised 500ms apart
   - failures are retried with jittered backoff (up to 3 tries, honouring `retry-after`)
-  - responses are cached for 5 minutes, so details → editions → comments on one book costs one page fetch
+  - responses are cached for 30 minutes, so details → editions → comments on one book costs one page fetch
+
+## Deploy
+
+```bash
+npx vercel deploy          # preview
+npx vercel deploy --prod   # production
+```
+
+`vercel.json` pins the region, caps functions at 120 s, and maps `/mcp` and `/health` to `api/`. The Hobby plan is enough: CPU is billed only while it is active, and the up-to-10 s upstream waits don't count.
 
 ## Develop
 
 ```bash
 npm test        # offline parser tests against saved pages in test/fixtures
 npm run smoke   # live end-to-end: spawns the server, calls all 9 tools
-npm run dev     # run from source
+MCP_URL=https://iranketab-mcp.vercel.app/mcp npm run smoke   # same, against a deployment
+npm run serve   # the HTTP handler locally on http://localhost:3000/mcp
+npm run dev     # stdio server from source
 ```
 
 When the site changes markup, `npm run smoke` goes red. Re-save a fixture and `npm test` shows which field broke.

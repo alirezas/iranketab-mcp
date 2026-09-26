@@ -1,11 +1,19 @@
-// End-to-end check against the live site: spawns the server over stdio with the
-// official MCP client and calls every tool once. `npm run smoke`.
+// End-to-end check against the live site with the official MCP client, calling
+// every tool once. `npm run smoke` spawns the server over stdio;
+// `MCP_URL=https://.../mcp npm run smoke` tests a deployed HTTP endpoint instead.
 
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 
 const client = new Client({ name: "smoke", version: "0" });
-await client.connect(new StdioClientTransport({ command: "npx", args: ["tsx", "src/index.ts"] }));
+const target = process.env.MCP_URL;
+await client.connect(
+  target
+    ? new StreamableHTTPClientTransport(new URL(target))
+    : new StdioClientTransport({ command: "npx", args: ["tsx", "src/index.ts"] }),
+);
+console.log(`target: ${target ?? "stdio"}`);
 
 let failed = 0;
 function check(name: string, ok: boolean, detail = "") {

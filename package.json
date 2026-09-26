@@ -1,6 +1,6 @@
 {
   "name": "iranketab-mcp",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Read-only MCP server for iranketab.ir: search books, compare editions and translations, prices in Toman, reviews.",
   "type": "module",
   "bin": {
@@ -14,7 +14,8 @@
     "dev": "tsx src/index.ts",
     "start": "node dist/index.js",
     "test": "tsx --test test/*.test.ts",
-    "smoke": "tsx scripts/smoke.ts"
+    "smoke": "tsx scripts/smoke.ts",
+    "serve": "tsx scripts/serve.ts"
   },
   "engines": {
     "node": ">=20"

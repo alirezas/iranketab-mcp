@@ -1,5 +1,5 @@
 // Polite HTTP client for iranketab.ir: one request at a time, spaced out,
-// retried with jittered backoff, and cached briefly so repeated tool calls
+// retried with jittered backoff, and cached for half an hour so repeated tool calls
 // (details -> editions -> comments on the same book) cost one upstream hit.
 
 export const BASE = "https://www.iranketab.ir";
@@ -7,7 +7,9 @@ export const BASE = "https://www.iranketab.ir";
 const USER_AGENT =
   "iranketab-mcp/0.1 (+https://github.com/alirezas/iranketab-mcp; read-only MCP server; polite: 1 req / 500ms)";
 const MIN_GAP_MS = 500;
-const CACHE_TTL_MS = 5 * 60_000;
+// Long enough that one slow first fetch (7-12s from hosts outside Iran) serves a
+// whole conversation about a book; short enough that prices stay roughly current.
+const CACHE_TTL_MS = 30 * 60_000;
 const CACHE_MAX = 200;
 const TIMEOUT_MS = 20_000;
 const MAX_TRIES = 3;
